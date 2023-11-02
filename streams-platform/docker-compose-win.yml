@@ -1,0 +1,176 @@
+version: '3'
+services:
+
+  db:
+    platform: windows/amd64
+    image: mysql:5.7
+
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'db'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'password'
+    volumes:
+      - ./docker/mysql:/var/lib/mysql
+  adminer:
+    platform: linux/arm64/v8
+    image: adminer
+    restart: always
+    ports:
+      - 8090:8080
+
+  zookeeper:
+    platform: windows/amd64
+    container_name: zookeeper
+    image: confluentinc/cp-zookeeper:4.0.0
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
+    volumes:
+      - ./docker/zookeeper/data:/data
+      - ./docker/zookeeper/datalog:/datalog
+
+  broker1:
+    platform: windows/amd64
+    container_name: broker1
+    image: confluentinc/cp-kafka:5.0.0
+    hostname: broker1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    volumes:
+      - ./docker/prometheus:/etc/prometheus
+      - ./docker/kafka1/data:/var/lib/kafka/data
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker1:19092,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_JMX_PORT: 9999
+    command: /etc/prometheus/run-kafka-server-with-java-agent.sh
+    restart: always
+
+  broker2:
+    platform: windows/amd64
+    container_name: broker2
+    image: confluentinc/cp-kafka:5.0.0
+    hostname: broker2
+    depends_on:
+      - zookeeper
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/prometheus:/etc/prometheus
+      - ./docker/kafka2/data:/var/lib/kafka/data
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker2:19093,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_JMX_PORT: 9999
+    command: /etc/prometheus/run-kafka-server-with-java-agent.sh
+    restart: always
+
+  broker3:
+    platform: windows/amd64
+    container_name: broker3
+    image: confluentinc/cp-kafka:5.0.0
+    hostname: broker3
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9094"
+    volumes:
+      - ./docker/prometheus:/etc/prometheus
+      - ./docker/kafka3/data:/var/lib/kafka/data
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://broker3:19094,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_JMX_PORT: 9999
+    command: /etc/prometheus/run-kafka-server-with-java-agent.sh
+    restart: always
+
+  schema-registry:
+    platform: windows/amd64
+    container_name: schema-registry
+    image: confluentinc/cp-schema-registry:4.0.0
+    hostname: schema-registry
+    depends_on:
+      - zookeeper
+      - broker1
+      - broker2
+      - broker3
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://broker1:19092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    restart: always
+#
+  rest-proxy:
+    platform: windows/amd64
+    container_name: rest-proxy
+    image: confluentinc/cp-kafka-rest:5.0.0
+    hostname: kafka-rest
+    depends_on:
+      - zookeeper
+      - broker1
+      - broker2
+      - broker3
+      - schema-registry
+    ports:
+      - "8082:8082"
+    environment:
+      KAFKA_REST_HOST_NAME: rest-proxy
+      KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      KAFKA_REST_BOOTSTRAP_SERVERS: 'PLAINTEXT://broker1:19092'
+    restart: always
+
+  cassandra:
+    platform: linux/arm64
+    container_name: cassandra
+    image: cassandra:3.11.4
+    hostname: cassandra
+    ports:
+      - "9042:9042"
+    expose:
+      - 7000
+      - 7001
+      - 7199
+      - 9042
+      - 9160
+    volumes:
+      - ./docker/cassandra:/etc/cassandra/docker
+    environment:
+      CASSANDRA_CLUSTER_NAME: 'data-externalization'
+      CASSANDRA_DC: 'local'
+    restart: always
+
+  kafka-topics-ui:
+    platform: windows/amd64
+    image: landoop/kafka-topics-ui:0.9.4
+    hostname: kafka-topics-ui
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_REST_PROXY_URL: "http://rest-proxy:8082/"
+      PROXY: "true"
+    depends_on:
+      - zookeeper
+      - broker1
+      - broker2
+      - broker3
+      - schema-registry
+      - rest-proxy

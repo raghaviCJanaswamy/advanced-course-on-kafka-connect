@@ -1,0 +1,9 @@
+*.iml
+.idea/
+out/
+.DS_Store
+generatedsources/
+docker/kafka1
+docker/kafka2
+docker/kafka3
+docker/zookeeper

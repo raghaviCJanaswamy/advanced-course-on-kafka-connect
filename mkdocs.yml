@@ -1,0 +1,31 @@
+site_name: 'Course on Kafka Connect'
+repo_name: 'kafkaconnect-source-sink-trial'
+repo_url: 'https://github.com/raghaviCJanaswamy/kafkaconnect-source-sink-trial'
+nav:
+  - Lab Manual:
+    - Lab - 1: labmanual/lab1.md
+    - Lab - 2: labmanual/lab2.md
+    - Lab - 3: labmanual/lab3.md
+  - Presentation Deck: labmanual/Kafka_Connect_pdf.pdf
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)" 
+      scheme: default
+      primary: 'light blue'
+      accent: 'light blue'
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)" 
+      scheme: slate
+      primary: 'light blue'
+      accent: 'light blue'
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
